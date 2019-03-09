@@ -1,0 +1,142 @@
+#!/bin/bash
+
+LOCKFILE="/run/lock/$(basename $0)"
+LOCKFD=99
+source /etc/seafile.conf
+if [[ -z $SEAFILE || -z $USERNAME ]]
+then
+	echo "Error: invalid configuration in /etc/seafile.conf"
+fi
+
+ulimit -n 30000
+
+function print_usage()
+{
+	echo "Usage:
+	seafctl start
+	seafctl stop
+	seafctl restart
+	seafctl gc
+	seafctl fsck [libraryID1, libraryID2, ...]
+	seafctl repair [libraryID1, libraryID2, ...]"
+}
+
+function seaf_start
+{
+	cd $SEAFILE
+	setuidgid $USERNAME ./seafile.sh start > /dev/null && setuidgid $USERNAME ./seahub.sh start > /dev/null
+}
+
+function seaf_stop
+{
+	cd $SEAFILE
+	setuidgid $USERNAME ./seahub.sh stop > /dev/null && setuidgid $USERNAME ./seafile.sh stop > /dev/null
+}
+
+function seaf_gc
+{
+	trap unlock EXIT
+	locknow
+	trap restart_and_unlock EXIT
+	seaf_stop
+	local log=/var/log/seafile-gc.log
+	cd $SEAFILE
+	setuidgid $USERNAME ./seaf-gc.sh $@ >> $log 2>&1
+	sync
+	if grep -iq 'damaged' $log
+	then
+		mail -s 'Some of the libraries may be damaged' $ADMIN_EMAIL < $log
+	fi
+}
+
+function seaf_fsck
+{
+	trap unlock EXIT
+	lock
+	trap restart_and_unlock EXIT
+	local log=/var/log/seafile-fsck.log
+	cd $SEAFILE
+	setuidgid $USERNAME ./seaf-fsck.sh $@ >> $log 2>&1
+	if grep -iq 'fail' $log
+	then
+		mail -s 'Seafile fsck found errors' $ADMIN_EMAIL < $log
+	fi
+}
+
+function seaf_repair
+{
+	trap unlock EXIT
+	lock
+	trap restart_and_unlock EXIT
+	seaf_stop
+	local log=/var/log/seafile-repair.log
+	cd $SEAFILE
+	setuidgid $USERNAME ./seaf-fsck.sh -r $@ >> $log 2>&1
+	sync
+	mail -s 'Seafile library repair results' $ADMIN_EMAIL < $log
+}
+
+function locknow
+{
+	eval "exec $LOCKFD>\"$LOCKFILE\""
+	flock -xn $LOCKFD || exit 1
+}
+
+function lock
+{
+	eval "exec $LOCKFD>\"$LOCKFILE\""
+	flock -x $LOCKFD
+}
+
+function unlock
+{
+	flock -u $LOCKFD
+	flock -xn $LOCKFD && rm -f $LOCKFILE
+}
+
+function restart_and_unlock
+{
+	seaf_start
+	unlock
+}
+
+#####################################################
+
+if (( $# == 0 ))
+then
+	print_usage
+fi
+command=$1
+shift
+
+case $command in
+stop)
+	trap unlock EXIT
+	locknow
+	seaf_stop
+	;;
+start)
+	trap restart_and_unlock EXIT
+	locknow
+	;;
+restart)
+	trap restart_and_unlock EXIT
+	locknow
+	seaf_stop
+	;;
+gc)
+	seaf_gc $@ &
+	echo "Garbage collection has started. An email will be sent to ${ADMIN_EMAIL} if there are any problems detected."
+	;;
+fsck)
+	seaf_fsck $@ &
+	echo "Libraries corruption check has started. An email will be sent to ${ADMIN_EMAIL} if there are any problems detected."
+	;;
+repair)
+	seaf_repair $@ &
+	echo "Libraries repair has started. An email will be sent to ${ADMIN_EMAIL} once the repar is finished."
+	;;
+*)
+	print_usage
+	;;
+esac
