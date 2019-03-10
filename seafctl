@@ -43,7 +43,7 @@ function seaf_gc
 	cd $SEAFILE
 	setuidgid $USERNAME ./seaf-gc.sh $@ >> $log 2>&1
 	sync
-	if grep -iq 'damaged' $log
+	if grep -Eiq 'damaged|failed' $log
 	then
 		mail -s 'Some of the libraries may be damaged' $ADMIN_EMAIL < $log
 	fi
@@ -57,7 +57,7 @@ function seaf_fsck
 	local log=/var/log/seafile-fsck.log
 	cd $SEAFILE
 	setuidgid $USERNAME ./seaf-fsck.sh $@ >> $log 2>&1
-	if grep -iq 'fail' $log
+	if grep -Eiq 'damaged|failed' $log
 	then
 		mail -s 'Seafile fsck found errors' $ADMIN_EMAIL < $log
 	fi
