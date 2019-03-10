@@ -21,3 +21,6 @@ All commands employ global lock to make sure user doesn't, e.g., accidentally st
 
 # Assumptions
 There is a regularly scheduled garbage collection, and it is scheduled to run through this script. Garbage collection runs often enough (for the available storage size) that it is no big deal if it is missed (in case its scheduled time is during the run of fsck or repair).
+
+# Installation
+* `sudo make install`
