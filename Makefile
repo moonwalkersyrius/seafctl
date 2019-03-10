@@ -5,5 +5,5 @@ all:
 
 install: 
 	cp seafctl /usr/local/bin/seafctl
-	cp seafctl-completion.bash /usr/share/bash-completion/completions/seafctl
+	cp seafctl-completion.bash /etc/bash_completion.d/seafctl
 	cp seafile.conf /etc/seafile.conf
