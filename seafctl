@@ -35,9 +35,9 @@ function seaf_stop
 
 function seaf_gc
 {
-	trap unlock EXIT
+	trap unlock RETURN
 	locknow
-	trap restart_and_unlock EXIT
+	trap restart_and_unlock RETURN
 	seaf_stop
 	local log=/var/log/seafile-gc.log
 	cd $SEAFILE
@@ -51,9 +51,9 @@ function seaf_gc
 
 function seaf_fsck
 {
-	trap unlock EXIT
+	trap unlock RETURN
 	lock
-	trap restart_and_unlock EXIT
+	trap restart_and_unlock RETURN
 	local log=/var/log/seafile-fsck.log
 	cd $SEAFILE
 	setuidgid $USERNAME ./seaf-fsck.sh $@ >> $log 2>&1
@@ -65,9 +65,9 @@ function seaf_fsck
 
 function seaf_repair
 {
-	trap unlock EXIT
+	trap unlock RETURN
 	lock
-	trap restart_and_unlock EXIT
+	trap restart_and_unlock RETURN
 	seaf_stop
 	local log=/var/log/seafile-repair.log
 	cd $SEAFILE
